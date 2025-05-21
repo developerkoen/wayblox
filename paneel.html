@@ -52,7 +52,7 @@
       background-color: #a18bff;
     }
 
-    textarea, input {
+    textarea, input, select {
       background: #1d1f35;
       color: white;
       border: none;
@@ -64,6 +64,11 @@
     textarea::placeholder,
     input::placeholder {
       color: #8a8fae;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
     }
   </style>
 </head>
@@ -85,19 +90,43 @@
     <input id="pageId" type="text" placeholder="paginanaam (bijv. paprikas)" style="width:100%;padding:0.5rem;margin-bottom:0.5rem;" />
     <textarea id="htmlCode" placeholder="Voer HTML in" style="width:100%;height:150px;padding:0.5rem;margin-bottom:0.5rem;"></textarea>
 
-    <label><input type="checkbox" class="roleCheckbox" value="admin"> admin</label>
-    <label><input type="checkbox" class="roleCheckbox" value="editor"> editor</label>
-    <label><input type="checkbox" class="roleCheckbox" value="viewer"> viewer</label>
+    <label><input type="checkbox" class="roleCheckbox" value="WebsiteAdmin"> WebsiteAdmin</label>
+    <label><input type="checkbox" class="roleCheckbox" value="Chairman"> Chairman</label>
+    <label><input type="checkbox" class="roleCheckbox" value="Vice-Chairman"> Vice-Chairman</label>
+    <label><input type="checkbox" class="roleCheckbox" value="Director"> Director</label>
+    <label><input type="checkbox" class="roleCheckbox" value="Manager"> Manager</label>
+    <label><input type="checkbox" class="roleCheckbox" value="Supervisor"> Supervisor</label>
 
     <br><br>
     <button onclick="uploadPage()">Pagina opslaan</button>
     <div id="uploadStatus" style="margin-top: 1rem;"></div>
   </section>
 
+  <hr style="margin: 3rem 0; border: 1px solid #333;">
+
+  <section>
+    <h2>👥 Gebruikersrollen Beheren</h2>
+    <select id="userSelector" style="width:100%;padding:0.5rem;margin-bottom:1rem;"></select>
+
+    <div id="roleCheckboxes">
+      <label><input type="checkbox" class="roleEditCheckbox" value="WebsiteAdmin"> WebsiteAdmin</label>
+      <label><input type="checkbox" class="roleEditCheckbox" value="Chairman"> Chairman</label>
+      <label><input type="checkbox" class="roleEditCheckbox" value="Vice-Chairman"> Vice-Chairman</label>
+      <label><input type="checkbox" class="roleEditCheckbox" value="Director"> Director</label>
+      <label><input type="checkbox" class="roleEditCheckbox" value="Manager"> Manager</label>
+      <label><input type="checkbox" class="roleEditCheckbox" value="Supervisor"> Supervisor</label>
+    </div>
+
+    <button onclick="saveUserRoles()">💾 Opslaan</button>
+    <div id="roleStatus" style="margin-top:1rem;"></div>
+  </section>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-    import { getFirestore, doc, getDoc, collection, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+    import {
+      getFirestore, doc, getDoc, collection, getDocs, setDoc
+    } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAMNUI7IJaYt5YY8LZaR7bVyL2y75voQ7I",
@@ -173,6 +202,54 @@
         statusDiv.innerText = `✅ Pagina '${pageId}' succesvol opgeslagen! Herlaad om deze te zien.`;
       } catch (error) {
         statusDiv.innerText = "❌ Fout bij opslaan: " + error.message;
+      }
+    };
+
+    const userSelector = document.getElementById("userSelector");
+    const roleStatus = document.getElementById("roleStatus");
+
+    async function fetchAllUsersManueel() {
+      const usersCol = collection(db, "users");
+      const snapshot = await getDocs(usersCol);
+      return snapshot.docs.map(doc => ({ uid: doc.id }));
+    }
+
+    fetchAllUsersManueel().then(async (users) => {
+      for (const user of users) {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const userEmail = userDoc.exists() ? userDoc.data().email || user.uid : user.uid;
+
+        const option = document.createElement("option");
+        option.value = user.uid;
+        option.textContent = userEmail;
+        userSelector.appendChild(option);
+      }
+
+      userSelector.addEventListener("change", async () => {
+        const selectedUID = userSelector.value;
+        const docRef = doc(db, "users", selectedUID);
+        const userDoc = await getDoc(docRef);
+        const roles = userDoc.exists() ? userDoc.data().roles || [] : [];
+
+        document.querySelectorAll(".roleEditCheckbox").forEach(cb => {
+          cb.checked = roles.includes(cb.value);
+        });
+      });
+    });
+
+    window.saveUserRoles = async function () {
+      const uid = userSelector.value;
+      const checkboxes = document.querySelectorAll(".roleEditCheckbox");
+      const roles = Array.from(checkboxes).filter(c => c.checked).map(c => c.value);
+
+      try {
+        await setDoc(doc(db, "users", uid), {
+          roles: roles
+        }, { merge: true });
+
+        roleStatus.textContent = "✅ Rollen opgeslagen voor gebruiker.";
+      } catch (e) {
+        roleStatus.textContent = "❌ Fout bij opslaan: " + e.message;
       }
     };
   </script>
